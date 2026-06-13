@@ -30,8 +30,13 @@ env:
 
 jobs:
   update:
-    runs-on: ubuntu-latest
+    # GitHub-hosted runners cannot reliably reach law.go.kr, so run on a
+    # self-hosted runner with verified outbound access to the law API.
+    runs-on: self-hosted
     timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout data repo
