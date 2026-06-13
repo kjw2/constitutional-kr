@@ -1,0 +1,20 @@
+# Local cache and generated indexes
+.cache/
+metadata.json
+stats.json
+
+# Python/tooling artifacts
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Temporary files
+*.tmp
+*.bak
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
