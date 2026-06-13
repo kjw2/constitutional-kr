@@ -1,0 +1,93 @@
+name: Constitutional Decisions Update
+
+on:
+  schedule:
+    - cron: '30 11 * * *' # 20:30 KST (UTC+9)
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Lookback days'
+        required: false
+        default: '14'
+      limit:
+        description: 'Optional smoke-test limit'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: constitutional-update
+  cancel-in-progress: false
+
+env:
+  WORKSPACE_ROOT: ${{ github.workspace }}
+  CONSTITUTIONAL_KR_REPO: ${{ github.workspace }}/constitutional-kr
+  PIPELINE_REPO: ${{ github.workspace }}/legalize-pipeline
+  LEGALIZE_CACHE_DIR: ${{ github.workspace }}/.cache
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout data repo
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          path: constitutional-kr
+
+      - name: Checkout pipeline
+        uses: actions/checkout@v6
+        with:
+          repository: kjw2/legalize-pipeline
+          ref: codex/constitutional-pipeline
+          path: legalize-pipeline
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: legalize-pipeline/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r "$PIPELINE_REPO/requirements.txt"
+
+      - name: Configure git
+        working-directory: ${{ env.CONSTITUTIONAL_KR_REPO }}
+        run: |
+          git config user.name "legalize-kr-bot"
+          git config user.email "bot@legalize.kr"
+
+      - name: Update decisions
+        working-directory: ${{ env.PIPELINE_REPO }}
+        env:
+          LAW_OC: ${{ secrets.LAW_OC }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          if [ -n "${LIMIT:-}" ]; then
+            python -m constitutional.fetch_cache --limit "$LIMIT"
+            python -m constitutional.import_decisions --limit "$LIMIT" --output-dir "$CONSTITUTIONAL_KR_REPO" --git --skip-dedup
+          else
+            python -m constitutional.update \
+              --days ${{ inputs.days || '14' }} \
+              --output-dir "$CONSTITUTIONAL_KR_REPO" \
+              --commit \
+              --refresh-recent
+          fi
+
+      - name: Validate
+        working-directory: ${{ env.PIPELINE_REPO }}
+        run: python -m constitutional.validate "$CONSTITUTIONAL_KR_REPO"
+
+      - name: Push changes
+        working-directory: ${{ env.CONSTITUTIONAL_KR_REPO }}
+        run: |
+          if [ -n "$(git log origin/main..HEAD --oneline)" ]; then
+            git push
+          else
+            echo "No new commits to push"
+          fi
