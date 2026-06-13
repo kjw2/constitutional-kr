@@ -63,6 +63,14 @@ jobs:
           git config user.name "legalize-kr-bot"
           git config user.email "bot@legalize.kr"
 
+      - name: Check law.go.kr connectivity
+        run: |
+          curl --connect-timeout 10 --max-time 20 --silent --show-error \
+            "$LAW_API_BASE/lawSearch.do?target=detc&type=XML&display=1&page=1&OC=$LAW_OC" \
+            >/dev/null
+        env:
+          LAW_OC: ${{ secrets.LAW_OC }}
+
       - name: Update decisions
         working-directory: ${{ env.PIPELINE_REPO }}
         env:
