@@ -26,6 +26,7 @@ env:
   CONSTITUTIONAL_KR_REPO: ${{ github.workspace }}/constitutional-kr
   PIPELINE_REPO: ${{ github.workspace }}/legalize-pipeline
   LEGALIZE_CACHE_DIR: ${{ github.workspace }}/.cache
+  LAW_API_BASE: https://www.law.go.kr/DRF
 
 jobs:
   update:
