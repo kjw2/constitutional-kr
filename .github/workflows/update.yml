@@ -45,6 +45,8 @@ jobs:
         with:
           repository: kjw2/law_repo_pipeline
           ref: main
+          ssh-key: ${{ secrets.PIPELINE_REPO_DEPLOY_KEY }}
+          persist-credentials: false
           path: legalize-pipeline
 
       - name: Setup Python
