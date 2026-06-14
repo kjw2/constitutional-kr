@@ -30,13 +30,8 @@ env:
 
 jobs:
   update:
-    # GitHub-hosted runners cannot reliably reach law.go.kr, so run on the
-    # dedicated Windows self-hosted runner with verified outbound API access.
-    runs-on: [self-hosted, Windows, X64, constitutional]
+    runs-on: ubuntu-latest
     timeout-minutes: 120
-    defaults:
-      run:
-        shell: pwsh
 
     steps:
       - name: Checkout data repo
@@ -52,11 +47,15 @@ jobs:
           ref: codex/constitutional-pipeline
           path: legalize-pipeline
 
-      - name: Show Python version
-        run: python --version
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: legalize-pipeline/requirements.txt
 
       - name: Install dependencies
-        run: python -m pip install -r "$env:PIPELINE_REPO/requirements.txt"
+        run: pip install -r "$PIPELINE_REPO/requirements.txt"
 
       - name: Configure git
         working-directory: ${{ env.CONSTITUTIONAL_KR_REPO }}
@@ -66,9 +65,13 @@ jobs:
 
       - name: Check law.go.kr connectivity
         run: |
-          curl.exe --connect-timeout 10 --max-time 20 --silent --show-error `
-            "$env:LAW_API_BASE/lawSearch.do?target=detc&type=XML&display=1&page=1&OC=$env:LAW_OC" `
-            | Out-Null
+          for attempt in 1 2 3 4 5; do
+            curl --connect-timeout 10 --max-time 20 --silent --show-error \
+              "$LAW_API_BASE/lawSearch.do?target=detc&type=XML&display=1&page=1&OC=$LAW_OC" \
+              >/dev/null && exit 0
+            sleep $((attempt * 10))
+          done
+          exit 1
         env:
           LAW_OC: ${{ secrets.LAW_OC }}
 
@@ -78,27 +81,26 @@ jobs:
           LAW_OC: ${{ secrets.LAW_OC }}
           LIMIT: ${{ inputs.limit }}
         run: |
-          if ($env:LIMIT) {
-            python -m constitutional.fetch_cache --limit "$env:LIMIT"
-            python -m constitutional.import_decisions --limit "$env:LIMIT" --output-dir "$env:CONSTITUTIONAL_KR_REPO" --git --skip-dedup
-          } else {
-            python -m constitutional.update `
-              --days ${{ inputs.days || '14' }} `
-              --output-dir "$env:CONSTITUTIONAL_KR_REPO" `
-              --commit `
+          if [ -n "${LIMIT:-}" ]; then
+            python -m constitutional.fetch_cache --limit "$LIMIT"
+            python -m constitutional.import_decisions --limit "$LIMIT" --output-dir "$CONSTITUTIONAL_KR_REPO" --git --skip-dedup
+          else
+            python -m constitutional.update \
+              --days ${{ inputs.days || '14' }} \
+              --output-dir "$CONSTITUTIONAL_KR_REPO" \
+              --commit \
               --refresh-recent
-          }
+          fi
 
       - name: Validate
         working-directory: ${{ env.PIPELINE_REPO }}
-        run: python -m constitutional.validate "$env:CONSTITUTIONAL_KR_REPO"
+        run: python -m constitutional.validate "$CONSTITUTIONAL_KR_REPO"
 
       - name: Push changes
         working-directory: ${{ env.CONSTITUTIONAL_KR_REPO }}
         run: |
-          $changes = git log origin/main..HEAD --oneline
-          if ($changes) {
+          if [ -n "$(git log origin/main..HEAD --oneline)" ]; then
             git push
-          } else {
-            "No new commits to push"
-          }
+          else
+            echo "No new commits to push"
+          fi
