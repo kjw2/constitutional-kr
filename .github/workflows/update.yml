@@ -43,8 +43,8 @@ jobs:
       - name: Checkout pipeline
         uses: actions/checkout@v6
         with:
-          repository: kjw2/legalize-pipeline
-          ref: codex/constitutional-pipeline
+          repository: kjw2/law_repo_pipeline
+          ref: main
           path: legalize-pipeline
 
       - name: Setup Python
