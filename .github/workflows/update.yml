@@ -52,15 +52,11 @@ jobs:
           ref: codex/constitutional-pipeline
           path: legalize-pipeline
 
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: legalize-pipeline/requirements.txt
+      - name: Show Python version
+        run: python --version
 
       - name: Install dependencies
-        run: pip install -r "$env:PIPELINE_REPO/requirements.txt"
+        run: python -m pip install -r "$env:PIPELINE_REPO/requirements.txt"
 
       - name: Configure git
         working-directory: ${{ env.CONSTITUTIONAL_KR_REPO }}
